@@ -1,1 +1,1 @@
-print(df[data])
+df.to_csv("stock_swdy.csv",index=False)

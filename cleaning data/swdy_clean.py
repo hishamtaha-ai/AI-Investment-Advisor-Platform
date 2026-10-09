@@ -14,5 +14,7 @@ rename={
 }
 df.rename(columns=rename,inplace=True)
 df.drop_duplicates()
+
+df["date"]=df["date"].str.replace("00:00:00+02:00","",regex=False)
 print(df["date"])
 df.to_csv("stock_swdy.csv",index=False)
