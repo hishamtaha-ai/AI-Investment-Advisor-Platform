@@ -5,7 +5,6 @@ void main() {
   runApp(const NexusApp());
 }
 
-// NEXUS Colors (Matching HTML/CSS Design Tokens)
 class NexusColors {
   static const teal = Color(0xFF0D7775);
   static const dark = Color(0xFF1D1B19);
@@ -18,7 +17,6 @@ class NexusColors {
   static const disabledBg = Color(0xFFDFD9D2);
 }
 
-// Main Application
 class NexusApp extends StatelessWidget {
   const NexusApp({super.key});
 
@@ -31,9 +29,6 @@ class NexusApp extends StatelessWidget {
   }
 }
 
-// ============================================================================
-// 1. LOGIN SCREEN
-// ============================================================================
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -42,7 +37,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final emailController = TextEditingController(text: 'a.vance@bridgewater.com');
+  final emailController = TextEditingController(text: '');
   final passwordController = TextEditingController();
 
   @override
@@ -72,7 +67,12 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    showMessage('Backend integration is coming soon.');
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SecuritySettingsScreen(),
+      ),
+    );
   }
 
   void openRegistration() {
@@ -88,7 +88,7 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const PlaceholderScreen(title: 'Reset your password'),
+        builder: (context) => const ForgotPasswordScreen(),
       ),
     );
   }
@@ -151,8 +151,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         isPassword: true,
                       ),
                       const SizedBox(height: 4),
-                      
-                      // Forgot Password Link Added Here
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
@@ -167,7 +165,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,
@@ -229,9 +226,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// ============================================================================
-// 2. REGISTRATION SCREEN
-// ============================================================================
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -240,10 +234,10 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final firstNameController = TextEditingController(text: 'Alistair');
-  final lastNameController = TextEditingController(text: 'Vance');
-  final dobController = TextEditingController(text: '14/03/1988');
-  final emailController = TextEditingController(text: 'a.vance@bridgewater.com');
+  final firstNameController = TextEditingController(text: '');
+  final lastNameController = TextEditingController(text: '');
+  final dobController = TextEditingController(text: '');
+  final emailController = TextEditingController(text: '');
   final passwordController = TextEditingController();
   final countryController = TextEditingController(text: 'Egypt');
   final timezoneController = TextEditingController(text: '(GMT+02:00) Cairo');
@@ -351,12 +345,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (firstNameController.text.isEmpty ||
         lastNameController.text.isEmpty ||
         dobController.text.isEmpty ||
-        email.isEmpty) {
+        email.isEmpty ||
+        passwordController.text.isEmpty) {
       showMessage('Please fill in all required fields.');
       return;
     }
 
-    showMessage('Account created successfully (Backend coming soon).');
+    if (!acceptTerms || !acceptPrivacy) {
+      showMessage('Please accept terms and policies.');
+      return;
+    }
+
+    Navigator.popUntil(context, (route) => route.isFirst);
+    showMessage('Account created successfully!');
   }
 
   @override
@@ -666,9 +667,670 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 }
 
-// ============================================================================
-// REUSABLE WIDGETS
-// ============================================================================
+class ForgotPasswordScreen extends StatefulWidget {
+  const ForgotPasswordScreen({super.key});
+
+  @override
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+}
+
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  final emailController = TextEditingController(text: 'a.vance@bridgewater.com');
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    super.dispose();
+  }
+
+  void sendCode() {
+    final email = emailController.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your email.')),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OtpScreen(email: email),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const NexusTopBar(),
+              const SizedBox(height: 24),
+              Text(
+                'Reset your password',
+                style: GoogleFonts.newsreader(
+                  fontSize: 34,
+                  fontWeight: FontWeight.w400,
+                  color: NexusColors.dark,
+                  height: 1.12,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                "Enter the email linked to your account. We'll send a verification code so you can set a new password.",
+                style: GoogleFonts.instrumentSans(
+                  fontSize: 15,
+                  color: NexusColors.gray,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 28),
+              NexusInput(
+                label: 'Email',
+                hint: 'Enter your email',
+                icon: Icons.mail_outline,
+                controller: emailController,
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const Spacer(),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: sendCode,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: NexusColors.teal,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    'Send code',
+                    style: GoogleFonts.instrumentSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Center(
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    'Back to sign in',
+                    style: GoogleFonts.instrumentSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: NexusColors.teal,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class OtpScreen extends StatefulWidget {
+  final String email;
+  const OtpScreen({super.key, required this.email});
+
+  @override
+  State<OtpScreen> createState() => _OtpScreenState();
+}
+
+class _OtpScreenState extends State<OtpScreen> {
+  final List<TextEditingController> controllers =
+      List.generate(6, (index) => TextEditingController());
+  final List<FocusNode> focusNodes = List.generate(6, (index) => FocusNode());
+
+  @override
+  void dispose() {
+    for (var c in controllers) {
+      c.dispose();
+    }
+    for (var f in focusNodes) {
+      f.dispose();
+    }
+    super.dispose();
+  }
+
+  void verifyOtp() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ResetPasswordScreen(email: widget.email),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    bool isComplete = controllers.every((c) => c.text.isNotEmpty);
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const NexusTopBar(),
+              const SizedBox(height: 24),
+              Text(
+                'Enter your code',
+                style: GoogleFonts.newsreader(
+                  fontSize: 34,
+                  fontWeight: FontWeight.w400,
+                  color: NexusColors.dark,
+                  height: 1.12,
+                ),
+              ),
+              const SizedBox(height: 10),
+              RichText(
+                text: TextSpan(
+                  style: GoogleFonts.instrumentSans(
+                    fontSize: 15,
+                    color: NexusColors.gray,
+                    height: 1.4,
+                  ),
+                  children: [
+                    const TextSpan(text: 'We sent a 6-digit code to '),
+                    TextSpan(
+                      text: widget.email,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: NexusColors.dark,
+                      ),
+                    ),
+                    const TextSpan(text: '. It expires in 10 minutes.'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(6, (index) {
+                  return SizedBox(
+                    width: 48,
+                    height: 60,
+                    child: TextField(
+                      controller: controllers[index],
+                      focusNode: focusNodes[index],
+                      textAlign: TextAlign.center,
+                      keyboardType: TextInputType.number,
+                      maxLength: 1,
+                      style: GoogleFonts.newsreader(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w500,
+                        color: NexusColors.dark,
+                      ),
+                      decoration: InputDecoration(
+                        counterText: '',
+                        filled: true,
+                        fillColor: focusNodes[index].hasFocus
+                            ? Colors.white
+                            : NexusColors.input,
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: NexusColors.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: NexusColors.teal,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                      onChanged: (value) {
+                        setState(() {});
+                        if (value.isNotEmpty && index < 5) {
+                          FocusScope.of(context).requestFocus(focusNodes[index + 1]);
+                        } else if (value.isEmpty && index > 0) {
+                          FocusScope.of(context).requestFocus(focusNodes[index - 1]);
+                        }
+                      },
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Resend code in 00:42',
+                    style: GoogleFonts.instrumentSans(
+                      fontSize: 14,
+                      color: NexusColors.gray,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('New code sent!')),
+                      );
+                    },
+                    child: Text(
+                      'Resend',
+                      style: GoogleFonts.instrumentSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: NexusColors.muted,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: isComplete ? verifyOtp : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: NexusColors.teal,
+                    disabledBackgroundColor: NexusColors.disabledBg,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    'Verify',
+                    style: GoogleFonts.instrumentSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Wrong email? ',
+                        style: GoogleFonts.instrumentSans(
+                          fontSize: 14,
+                          color: NexusColors.gray,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(
+                          'Change address',
+                          style: GoogleFonts.instrumentSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: NexusColors.teal,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ResetPasswordScreen extends StatefulWidget {
+  final String email;
+  const ResetPasswordScreen({super.key, required this.email});
+
+  @override
+  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
+}
+
+class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+  final newPasswordController = TextEditingController();
+  final confirmPasswordController = TextEditingController();
+
+  @override
+  void dispose() {
+    newPasswordController.dispose();
+    confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  void resetPassword() {
+    if (newPasswordController.text.isEmpty ||
+        confirmPasswordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all fields.')),
+      );
+      return;
+    }
+    if (newPasswordController.text != confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match.')),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Password updated successfully!')),
+    );
+
+    Navigator.popUntil(context, (route) => route.isFirst);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const NexusTopBar(),
+              const SizedBox(height: 24),
+              Text(
+                'Create a new password',
+                style: GoogleFonts.newsreader(
+                  fontSize: 34,
+                  fontWeight: FontWeight.w400,
+                  color: NexusColors.dark,
+                  height: 1.12,
+                ),
+              ),
+              const SizedBox(height: 10),
+              RichText(
+                text: TextSpan(
+                  style: GoogleFonts.instrumentSans(
+                    fontSize: 15,
+                    color: NexusColors.gray,
+                    height: 1.4,
+                  ),
+                  children: [
+                    const TextSpan(text: 'Your code was verified. Choose a new password for '),
+                    TextSpan(
+                      text: widget.email,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: NexusColors.dark,
+                      ),
+                    ),
+                    const TextSpan(text: '.'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+              NexusInput(
+                label: 'New password',
+                hint: 'Min. 12 characters',
+                icon: Icons.lock_outline,
+                controller: newPasswordController,
+                isPassword: true,
+                helperText: 'Use upper and lower case, a digit and a symbol.',
+              ),
+              const SizedBox(height: 16),
+              NexusInput(
+                label: 'Confirm password',
+                hint: 'Repeat new password',
+                icon: Icons.lock_outline,
+                controller: confirmPasswordController,
+                isPassword: true,
+              ),
+              const SizedBox(height: 40),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: resetPassword,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: NexusColors.teal,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    'Reset password',
+                    style: GoogleFonts.instrumentSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Center(
+                child: TextButton(
+                  onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
+                  child: Text(
+                    'Back to sign in',
+                    style: GoogleFonts.instrumentSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: NexusColors.teal,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class SecuritySettingsScreen extends StatefulWidget {
+  const SecuritySettingsScreen({super.key});
+
+  @override
+  State<SecuritySettingsScreen> createState() => _SecuritySettingsScreenState();
+}
+
+class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
+  final currentPasswordController = TextEditingController(text: '............');
+  final newPasswordController = TextEditingController();
+  final confirmPasswordController = TextEditingController();
+
+  bool isSuccessShown = false;
+
+  @override
+  void dispose() {
+    currentPasswordController.dispose();
+    newPasswordController.dispose();
+    confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  void updatePassword() {
+    if (currentPasswordController.text.isEmpty ||
+        newPasswordController.text.isEmpty ||
+        confirmPasswordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all fields.')),
+      );
+      return;
+    }
+
+    if (newPasswordController.text != confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match.')),
+      );
+      return;
+    }
+
+    setState(() {
+      isSuccessShown = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: NexusColors.input,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: NexusColors.border),
+                      ),
+                      child: const Icon(
+                        Icons.chevron_left,
+                        color: NexusColors.dark,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Text(
+                    'Settings',
+                    style: GoogleFonts.instrumentSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: NexusColors.dark,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Security',
+                style: GoogleFonts.newsreader(
+                  fontSize: 34,
+                  fontWeight: FontWeight.w400,
+                  color: NexusColors.dark,
+                  height: 1.12,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Change your password or the email you sign in with.',
+                style: GoogleFonts.instrumentSans(
+                  fontSize: 15,
+                  color: NexusColors.gray,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 28),
+              Text(
+                'Change password',
+                style: GoogleFonts.instrumentSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: NexusColors.dark,
+                ),
+              ),
+              const SizedBox(height: 16),
+              NexusInput(
+                label: 'Current password',
+                hint: 'Enter current password',
+                controller: currentPasswordController,
+                isPassword: true,
+              ),
+              const SizedBox(height: 16),
+              NexusInput(
+                label: 'New password',
+                hint: 'Min. 12 characters',
+                controller: newPasswordController,
+                isPassword: true,
+              ),
+              const SizedBox(height: 16),
+              NexusInput(
+                label: 'Confirm new password',
+                hint: 'Repeat new password',
+                controller: confirmPasswordController,
+                isPassword: true,
+              ),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: updatePassword,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: NexusColors.teal,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    'Update password',
+                    style: GoogleFonts.instrumentSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              if (isSuccessShown) ...[
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  height: 52,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check, size: 20, color: Color(0xFF2E7D32)),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Password updated.',
+                        style: GoogleFonts.instrumentSans(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF2E7D32),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class NexusTopBar extends StatelessWidget {
   const NexusTopBar({super.key});
@@ -898,35 +1560,6 @@ class _NexusInputState extends State<NexusInput> {
           ),
         ],
       ],
-    );
-  }
-}
-
-// Temporary Screen For Navigation
-class PlaceholderScreen extends StatelessWidget {
-  final String title;
-  const PlaceholderScreen({super.key, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: Text(
-          'NEXUS',
-          style: GoogleFonts.newsreader(color: NexusColors.teal),
-        ),
-      ),
-      body: Center(
-        child: Text(
-          title,
-          style: GoogleFonts.newsreader(
-            fontSize: 30,
-            color: NexusColors.dark,
-          ),
-        ),
-      ),
     );
   }
 }
