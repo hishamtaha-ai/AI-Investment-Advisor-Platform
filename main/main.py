@@ -54,7 +54,9 @@ for file in raw_folder.rglob("*.csv"):
 
 if dataframes:
     final_df = pd.concat(dataframes, ignore_index=True)
-    final_df.to_csv("all_cleaned.csv", index=False)
+    final_df.to_csv(
+    r"D:\project1\AI-Investment-Advisor-Platform\data\all_cleaned.csv",
+    index=False)
 
 print(os.getcwd())
     
