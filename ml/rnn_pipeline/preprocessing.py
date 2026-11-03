@@ -1,8 +1,7 @@
 """Preprocessing for the all-tickers RNN pipeline.
 
 Reads the cleaned market data from the repository ``data/`` folder
-(``data/all_cleaned.csv``), NOT from ``ml/data/`` (which is a Phase 0
-stub with no implementation).
+(``data/all_cleaned.csv``).
 
 For every ticker, independently:
   - sort by date,
@@ -15,8 +14,6 @@ For every ticker, independently:
       val:   date >= 2025-01-01 and target_date <= 2025-12-31
       gap:   rows in between are dropped, never used
   - keep the last 2025 row with valid features as the forecast input.
-
-All printed text and log messages are in English only.
 """
 
 from __future__ import annotations
