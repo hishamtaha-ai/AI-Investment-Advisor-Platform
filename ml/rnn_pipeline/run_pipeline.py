@@ -1,10 +1,5 @@
 """Run the all-tickers RNN pipeline.
 
-Usage, from the repository root:
-
-    python ml/rnn_pipeline/run_pipeline.py --data data/all_cleaned.csv
-    python ml/rnn_pipeline/run_pipeline.py --data data/all_cleaned.csv --tickers "SWDY_El Sewedy Electric"
-
 By default (no --output given) results go to ml/results/, so the
 code folder and the results/logs folder both live inside ml/.
 
@@ -20,8 +15,6 @@ holds BOTH the log file and the results together:
 
 Nothing is ever overwritten: if a folder with the same timestamp
 already exists, a numeric suffix (_01, _02, ...) is appended.
-
-All printed text and log messages are in English only.
 """
 
 from __future__ import annotations
