@@ -1,21 +1,7 @@
-"""SimpleRNN model, identical in architecture to the SWDY notebook.
-
-Architecture: Input (1 time step, 2 features) -> SimpleRNN(32, relu)
--> Dense(16, relu) -> Dense(1). Optimizer Adam(lr=0.005), loss MAE,
-100 epochs, batch 32, EarlyStopping on val_loss with patience 100
-and restore_best_weights=True.
-
-The scaler is fitted on the training features of ONE ticker only,
-never on validation, forecast or other tickers' data.
-"""
-
 from __future__ import annotations
 
 import os
 
-# oneDNN graph optimisation breaks SimpleRNN(relu) training on some
-# TensorFlow CPU builds (it produced MAE ~12 on SWDY here, versus
-# ~2.8 with oneDNN off). Must be set before TensorFlow is imported.
 os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 
 from dataclasses import dataclass
@@ -46,17 +32,6 @@ class TickerResult:
 
 
 def build_rnn() -> tf.keras.Model:
-    # Deviation from the original Colab notebook, made deliberately:
-    # the notebook relied on fit(shuffle=True), whose batch order and
-    # floating-point threading make the same code give very different
-    # SWDY results on different machines (observed locally: MAE 12.1,
-    # 4.8 and 2.8 across runs). For a pipeline that must be re-run for
-    # 198 tickers and compared run-to-run, training is made
-    # deterministic instead: fixed seeds, op determinism, and
-    # shuffle=False (which also respects the time-series order).
-    # Architecture, features, scaler, loss and optimizer are unchanged.
-    # On this machine the deterministic SWDY result is MAE ~2.91
-    # (Colab notebook: 2.548); data, baseline and architecture match.
     np.random.seed(42)
     tf.random.set_seed(42)
     tf.keras.utils.set_random_seed(42)
