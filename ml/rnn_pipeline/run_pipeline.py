@@ -1,22 +1,3 @@
-"""Run the all-tickers RNN pipeline.
-
-By default (no --output given) results go to ml/results/, so the
-code folder and the results/logs folder both live inside ml/.
-
-Every run creates a NEW folder inside the output folder, named by
-timestamp, for example ``ml/results/run_20261104_120000/``. That folder
-holds BOTH the log file and the results together:
-
-    run_YYYYMMDD_HHMMSS/
-        run.log            (per-ticker progress, metrics, skips, errors)
-        results.csv        (one row per trained ticker)
-        predictions.csv    (validation predictions per ticker)
-        summary.json       (run metadata and totals)
-
-Nothing is ever overwritten: if a folder with the same timestamp
-already exists, a numeric suffix (_01, _02, ...) is appended.
-"""
-
 from __future__ import annotations
 
 import argparse
