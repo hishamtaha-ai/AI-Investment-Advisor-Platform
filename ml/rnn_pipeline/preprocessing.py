@@ -1,21 +1,3 @@
-"""Preprocessing for the all-tickers RNN pipeline.
-
-Reads the cleaned market data from the repository ``data/`` folder
-(``data/all_cleaned.csv``).
-
-For every ticker, independently:
-  - sort by date,
-  - build ``close_lag_1`` (previous session close) and ``ma_5``
-    (5-session moving average of close),
-  - build the target ``target_close_40d`` (close 40 sessions ahead),
-  - split temporally with a 40-session purging gap, exactly like the
-    original SWDY notebook:
-      train: target_date < 2025-01-01
-      val:   date >= 2025-01-01 and target_date <= 2025-12-31
-      gap:   rows in between are dropped, never used
-  - keep the last 2025 row with valid features as the forecast input.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
