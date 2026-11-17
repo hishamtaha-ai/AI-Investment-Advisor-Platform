@@ -1,17 +1,31 @@
 from __future__ import annotations
 
-import os
-
-os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
-
+import copy
 from dataclasses import dataclass
 
 import numpy as np
-import tensorflow as tf
+import torch
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import StandardScaler
+from torch import nn
 
 from preprocessing import FEATURE_COLS, TARGET_COL
+
+# Use the GPU when PyTorch can see one, otherwise fall back to CPU.
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+_DEVICE_ANNOUNCED = False
+
+
+def _announce_device() -> None:
+    global _DEVICE_ANNOUNCED
+    if _DEVICE_ANNOUNCED:
+        return
+    _DEVICE_ANNOUNCED = True
+    if DEVICE.type == "cuda":
+        print(f"Using device: cuda ({torch.cuda.get_device_name(0)})")
+    else:
+        print("Using device: cpu (no CUDA GPU found)")
 
 
 @dataclass
@@ -31,28 +45,75 @@ class TickerResult:
     val_targets: np.ndarray
 
 
-def build_rnn() -> tf.keras.Model:
+class RNNModel(nn.Module):
+    """SimpleRNN(32, relu) -> Dense(16, relu) -> Dense(1), as in the notebook."""
+
+    def __init__(self, input_size: int) -> None:
+        super().__init__()
+        self.rnn = nn.RNN(
+            input_size=input_size,
+            hidden_size=32,
+            num_layers=1,
+            nonlinearity="relu",
+            batch_first=True,
+        )
+        self.fc1 = nn.Linear(32, 16)
+        self.fc2 = nn.Linear(16, 1)
+        self.relu = nn.ReLU()
+        self._init_weights()
+
+    def _init_weights(self) -> None:
+        # Mirror the Keras default initializers of the original model:
+        # Glorot uniform kernels, orthogonal recurrent kernel, zero biases.
+        nn.init.xavier_uniform_(self.rnn.weight_ih_l0)
+        nn.init.orthogonal_(self.rnn.weight_hh_l0)
+        nn.init.zeros_(self.rnn.bias_ih_l0)
+        nn.init.zeros_(self.rnn.bias_hh_l0)
+        nn.init.xavier_uniform_(self.fc1.weight)
+        nn.init.zeros_(self.fc1.bias)
+        nn.init.xavier_uniform_(self.fc2.weight)
+        nn.init.zeros_(self.fc2.bias)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out, _ = self.rnn(x)
+        last_step = out[:, -1, :]
+        hidden = self.relu(self.fc1(last_step))
+        return self.fc2(hidden).squeeze(-1)
+
+
+def build_rnn() -> nn.Module:
     np.random.seed(42)
-    tf.random.set_seed(42)
-    tf.keras.utils.set_random_seed(42)
+    torch.manual_seed(42)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(42)
     try:
-        tf.config.experimental.enable_op_determinism()
+        # warn_only=True: a few CUDA kernels have no deterministic version
+        # and would raise instead of train; on CPU this changes nothing.
+        torch.use_deterministic_algorithms(True, warn_only=True)
     except Exception:
-        pass
-    model = tf.keras.Sequential(
-        [
-            tf.keras.layers.Input(shape=(1, len(FEATURE_COLS))),
-            tf.keras.layers.SimpleRNN(32, activation="relu"),
-            tf.keras.layers.Dense(16, activation="relu"),
-            tf.keras.layers.Dense(1),
-        ]
-    )
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.005), loss="mae")
-    return model
+        try:
+            torch.use_deterministic_algorithms(True)
+        except Exception:
+            pass
+    if DEVICE.type == "cuda":
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    return RNNModel(input_size=len(FEATURE_COLS)).to(DEVICE)
+
+
+def _to_tensor(values: np.ndarray) -> torch.Tensor:
+    arr = np.asarray(values, dtype=np.float32)
+    tensor = torch.from_numpy(arr).reshape((len(arr), 1, len(FEATURE_COLS)))
+    return tensor.to(DEVICE)
+
+
+def _target_tensor(values: np.ndarray) -> torch.Tensor:
+    return torch.from_numpy(np.asarray(values, dtype=np.float32)).to(DEVICE)
 
 
 def train_and_evaluate_ticker(split, epochs: int = 100) -> TickerResult:
     """Train one RNN for one ticker split and evaluate on its validation set."""
+    _announce_device()
     train, val, forecast_input = split.train, split.val, split.forecast_input
 
     x_train = train[FEATURE_COLS].values
@@ -66,37 +127,60 @@ def train_and_evaluate_ticker(split, epochs: int = 100) -> TickerResult:
     x_val_scaled = scaler.transform(x_val)
     x_forecast_scaled = scaler.transform(x_forecast)
 
-    x_train_rnn = x_train_scaled.reshape((len(x_train_scaled), 1, len(FEATURE_COLS)))
-    x_val_rnn = x_val_scaled.reshape((len(x_val_scaled), 1, len(FEATURE_COLS)))
-    x_forecast_rnn = x_forecast_scaled.reshape(
-        (len(x_forecast_scaled), 1, len(FEATURE_COLS))
-    )
+    x_train_t = _to_tensor(x_train_scaled)
+    y_train_t = _target_tensor(y_train)
+    x_val_t = _to_tensor(x_val_scaled)
+    y_val_t = _target_tensor(y_val)
+    x_forecast_t = _to_tensor(x_forecast_scaled)
 
     baseline_preds = val["close"].values
     baseline_mae = float(mean_absolute_error(y_val, baseline_preds))
     baseline_rmse = float(np.sqrt(mean_squared_error(y_val, baseline_preds)))
 
     model = build_rnn()
-    early_stop = tf.keras.callbacks.EarlyStopping(
-        monitor="val_loss", patience=100, restore_best_weights=True
-    )
-    history = model.fit(
-        x_train_rnn,
-        y_train,
-        validation_data=(x_val_rnn, y_val),
-        epochs=epochs,
-        batch_size=32,
-        shuffle=False,
-        callbacks=[early_stop],
-        verbose=0,
-    )
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.005, eps=1e-7)
+    loss_fn = nn.L1Loss()
 
-    val_preds = model.predict(x_val_rnn, verbose=0).flatten()
+    batch_size = 32
+    patience = 100
+    best_val_loss = float("inf")
+    best_epoch = 0
+    best_state = copy.deepcopy(model.state_dict())
+    epochs_without_improvement = 0
+
+    for epoch in range(epochs):
+        model.train()
+        for start in range(0, len(x_train_t), batch_size):
+            xb = x_train_t[start : start + batch_size]
+            yb = y_train_t[start : start + batch_size]
+            optimizer.zero_grad()
+            loss = loss_fn(model(xb), yb)
+            loss.backward()
+            optimizer.step()
+
+        model.eval()
+        with torch.no_grad():
+            val_loss = float(loss_fn(model(x_val_t), y_val_t))
+
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            best_epoch = epoch + 1
+            best_state = copy.deepcopy(model.state_dict())
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
+            if epochs_without_improvement >= patience:
+                break
+
+    model.load_state_dict(best_state)
+    model.eval()
+    with torch.no_grad():
+        val_preds = model(x_val_t).cpu().numpy().flatten()
+        forecast_price = float(model(x_forecast_t).cpu().numpy().flatten()[0])
+
     rnn_mae = float(mean_absolute_error(y_val, val_preds))
     rnn_rmse = float(np.sqrt(mean_squared_error(y_val, val_preds)))
-    best_epoch = int(np.argmin(history.history["val_loss"]) + 1)
 
-    forecast_price = float(model.predict(x_forecast_rnn, verbose=0).flatten()[0])
     last_close = float(forecast_input["close"].iloc[0])
     forecast_change_pct = float((forecast_price - last_close) / last_close * 100)
 
